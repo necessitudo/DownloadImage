@@ -1,25 +1,23 @@
 package ru.necessitudo.downloadimage;
 
-import android.app.DownloadManager;
 import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.content.Context;
+import android.content.Intent;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.support.v7.app.NotificationCompat;
-import android.util.Log;
+
 import android.view.View;
 import android.widget.ImageView;
-import android.widget.Toast;
+
 
 import com.squareup.picasso.Picasso;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.Authenticator;
 
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -31,10 +29,10 @@ public class MainActivity extends AppCompatActivity {
     private NotificationManager mNotifyManager;
     NotificationCompat.Builder mBuilder;
     public static final String TAG = "happy";
-    int id = 1;
     private  String pathToPicture;
 
     private  ImageView image;
+    private String url = "https://farm3.staticflickr.com/2904/33143941260_5332f8ff6f_q.jpg";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -43,6 +41,18 @@ public class MainActivity extends AppCompatActivity {
         image = (ImageView) findViewById(R.id.picture);
 
         pathToPicture = getFilesDir()+"/picture.jpg";
+
+        Intent pictureIntent = getIntent();
+        if(pictureIntent!=null && pictureIntent.hasExtra("setPicture")){
+            File file = new File(pathToPicture);
+            if(file.exists()) {
+                Picasso.with(this).load(file).into(image);
+            }
+        }
+    }
+
+    public void onClick(View view) {
+
 
         mNotifyManager =
                 (NotificationManager) getSystemService(this.NOTIFICATION_SERVICE);
@@ -61,10 +71,9 @@ public class MainActivity extends AppCompatActivity {
         new Thread(
                 new Runnable() {
 
-
                     private void download() throws  Exception{
                         OkHttpClient client = new OkHttpClient();
-                        Request request = new Request.Builder().url("https://farm3.staticflickr.com/2904/33143941260_5332f8ff6f_q.jpg").build();
+                        Request request = new Request.Builder().url(url).build();
 
                         String path = pathToPicture;
 
@@ -73,24 +82,42 @@ public class MainActivity extends AppCompatActivity {
                         BufferedInputStream  bis = new BufferedInputStream(responce.body().byteStream());
                         BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(path));
 
-                        long allByte = bis.available();
-
+                        int allByte = Integer.parseInt(responce.header("Content-Length"));
                         int len;
+
+                        byte[] buffer = new byte[50*1024];
+
+                        int incr=0;
+                        //mBuilder.setProgress(allByte, incr, false);
 
                         while ((len = bis.read())!=-1) {
                             bos.write(len);
+                            incr+=len;
+
+                            //mBuilder.setProgress(allByte, incr, false);
+                            //mNotifyManager.notify(R.id.SET_PICTURE_ID, mBuilder.build());
                         }
+
+                        Context context = getApplicationContext();
+                        Intent intent = new Intent(context, MainActivity.class);
+                        intent.putExtra("setPicture", true);
+
+                        PendingIntent picturePendingIntent = PendingIntent.getActivity(
+                                context, R.id.SET_PICTURE_ID, intent, PendingIntent.FLAG_UPDATE_CURRENT);
+
+                        mBuilder.setContentText("Download complete").setProgress(0, 0, false);
+                        mBuilder.setContentIntent(picturePendingIntent).setAutoCancel(true);
+                        mNotifyManager.notify(R.id.SET_PICTURE_ID, mBuilder.build());
 
                         bis.close();
                         bos.close();
 
-                    }
 
+                    }
 
 
                     @Override
                     public void run()   {
-                        int incr;
 
                         try {
                             download();
@@ -98,53 +125,17 @@ public class MainActivity extends AppCompatActivity {
                             e.printStackTrace();
                         }
 
-
-
-
-
-
-                        //}
-                        //catch (Exception e){
-                         //   Log.d("fail", "Not success");
-                       // }
-
-                        /*// Do the "lengthy" operation 20 times
-                        for (incr = 0; incr <= 100; incr += 5) {
-                            // Sets the progress indicator to a max value, the
-                            // current completion percentage, and "determinate"
-                            // state
-                            mBuilder.setProgress(100, incr, false);
-                            // Displays the progress bar for the first time.
-                            mNotifyManager.notify(id, mBuilder.build());
-                            // Sleeps the thread, simulating an operation
-                            // that takes time
-                            try {
-                                // Sleep for 5 seconds
-                                Thread.sleep(5 * 1000);
-                            } catch (InterruptedException e) {
-                                Log.d(TAG, "sleep failure");
-                            }
-                        }*/
-                        // When the loop is finished, updates the notification
-                        /*mBuilder.setContentText("Download complete")
-                                // Removes the progress bar
-                                .setProgress(0, 0, false);
-                        mNotifyManager.notify(id, mBuilder.build());*/
                     }
                 }
-        // Starts the thread by calling the run() method in its Runnable
+                // Starts the thread by calling the run() method in its Runnable
         ).start();
-
     }
 
-    public void onClick(View view) {
+    public void setPicture(View view) {
         File file = new File(pathToPicture);
-
-        if(file.exists()){
-            Toast.makeText(this,"file exist!", Toast.LENGTH_SHORT).show();
-        }
-
-        Picasso.with(this).load(file).into(image);
+        if(file.exists()) {
+            Picasso.with(this).load(file).into(image);
+        };
     }
 }
 
